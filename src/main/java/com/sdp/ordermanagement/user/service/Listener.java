@@ -1,6 +1,6 @@
 package com.sdp.ordermanagement.user.service;
 
-import org.apache.kafka.clients.consumer.Consumer;
+import com.sdp.ordermanagement.user.dto.UserEvent;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -14,31 +14,41 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Service
 public class Listener implements ConsumerSeekAware {
 
-    private final List<String> messages = new CopyOnWriteArrayList<>();
+    private final List<UserEvent> messages = new CopyOnWriteArrayList<>();
     private long seekTime;
 
-    @KafkaListener(topics = "anand-topic", groupId = "my-group")
-    public void listen(ConsumerRecord<String, String> record) {
+    @KafkaListener(
+            topics = "anand-topic",
+            groupId = "my-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void listen(ConsumerRecord<String, UserEvent> record) {
+
         if (record.timestamp() >= seekTime) {
             System.out.println("🟢 Received: " + record.value());
             messages.add(record.value());
         } else {
-            System.out.println("⏳ Skipping old message: " + record.value() + " with timestamp " + record.timestamp());
+            System.out.println("⏳ Skipping old message: " + record.value());
         }
     }
 
     @Override
-    public void onPartitionsAssigned(Map<TopicPartition, Long> assignments, ConsumerSeekCallback callback) {
-        // Compute seek time *now*, not during class init
-        seekTime = System.currentTimeMillis() - Duration.ofSeconds(10).toMillis();
+    public void onPartitionsAssigned(Map<TopicPartition, Long> assignments,
+                                     ConsumerSeekCallback callback) {
+
+        seekTime = System.currentTimeMillis()
+                - Duration.ofSeconds(10).toMillis();
 
         for (TopicPartition partition : assignments.keySet()) {
-            callback.seekToTimestamp(partition.topic(), partition.partition(), seekTime);
-            System.out.println("⏱ Seeking to: " + seekTime + " for partition " + partition.partition());
+            callback.seekToTimestamp(
+                    partition.topic(),
+                    partition.partition(),
+                    seekTime
+            );
         }
     }
 
-    public List<String> getMessages() {
+    public List<UserEvent> getMessages() {
         return messages;
     }
 }
